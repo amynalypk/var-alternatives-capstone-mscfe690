@@ -1,0 +1,191 @@
+{
+    "summary_stats": {
+        "Observations": 5031,
+        "Mean Daily (%)": 0.03964522425778265,
+        "Daily Volatility (%)": 1.1568456999388683,
+        "Annualized Return (%)": 9.990596512961227,
+        "Annualized Volatility (%)": 18.364356163876174,
+        "Skewness": -0.27066830001307324,
+        "Excess Kurtosis": 15.208582891436546,
+        "Jarque-Bera Stat": 48547.900400267004,
+        "Jarque-Bera p-val": 0.0
+    },
+    "spy_stats": {
+        "Observations": 5031,
+        "Mean Daily (%)": 0.039028494598849814,
+        "Daily Volatility (%)": 1.200578973909131,
+        "Annualized Return (%)": 9.835180638910154,
+        "Annualized Volatility (%)": 19.058600365539988,
+        "Skewness": -0.3773257273402248,
+        "Excess Kurtosis": 14.383917410907824,
+        "Jarque-Bera Stat": 43490.1816023042,
+        "Jarque-Bera p-val": 0.0
+    },
+    "garch_params": {
+        "mu": 0.0006992211444832305,
+        "omega": 2.3686533821826554e-06,
+        "alpha": 0.12918247187471504,
+        "beta": 0.8486137924387375,
+        "persistence": 0.9777962643134526
+    },
+    "evt_params": {
+        "u": 1.2962445916306957,
+        "xi": 0.014226444921493483,
+        "beta": 0.6748782360808911,
+        "n_u": 503,
+        "n_tot": 5031,
+        "var_z_99": 2.8758028151732886,
+        "es_z_99": 3.5832165315950846,
+        "var_z_975": 2.240974378322413,
+        "es_z_975": 2.9392264046735743
+    },
+    "perf_summary": {
+        "VaR_Normal": {
+            "Total Obs": 4531,
+            "Expected Breaches": 45.31000000000004,
+            "Actual Breaches": 132,
+            "Breach Rate (%)": 2.913264180092695,
+            "Kupiec LR_uc": 110.59463975519411,
+            "Kupiec p-val": 0.0,
+            "Christoffersen LR_ind": 23.723819609263042,
+            "Independence p-val": 1.1119773201118122e-06,
+            "Conditional Cov LR_cc": 134.31845936445714,
+            "Conditional Cov p-val": 0.0,
+            "Mean Excess Loss (%)": 1.1211372520246552,
+            "Max Excess Loss (%)": 8.858944247662587,
+            "Transitions (00,01,10,11)": [
+                4282,
+                116,
+                116,
+                16
+            ]
+        },
+        "VaR_Historical": {
+            "Total Obs": 4531,
+            "Expected Breaches": 45.31000000000004,
+            "Actual Breaches": 78,
+            "Breach Rate (%)": 1.7214742882365925,
+            "Kupiec LR_uc": 19.59505971047753,
+            "Kupiec p-val": 9.57163779158332e-06,
+            "Christoffersen LR_ind": 12.663228129161537,
+            "Independence p-val": 0.00037291777592995956,
+            "Conditional Cov LR_cc": 32.25828783963907,
+            "Conditional Cov p-val": 9.890125396427862e-08,
+            "Mean Excess Loss (%)": 1.2220791433772202,
+            "Max Excess Loss (%)": 8.399211963630984,
+            "Transitions (00,01,10,11)": [
+                4381,
+                71,
+                71,
+                7
+            ]
+        },
+        "VaR_GARCH_EVT": {
+            "Total Obs": 4531,
+            "Expected Breaches": 45.31000000000004,
+            "Actual Breaches": 46,
+            "Breach Rate (%)": 1.015228426395939,
+            "Kupiec LR_uc": 0.010560821483983596,
+            "Kupiec p-val": 0.9181488034604419,
+            "Christoffersen LR_ind": 0.46919145495298664,
+            "Independence p-val": 0.49335937239238903,
+            "Conditional Cov LR_cc": 0.4797522764369702,
+            "Conditional Cov p-val": 0.786725300229184,
+            "Mean Excess Loss (%)": 0.806590542251903,
+            "Max Excess Loss (%)": 3.9284981730208703,
+            "Transitions (00,01,10,11)": [
+                4439,
+                45,
+                45,
+                1
+            ]
+        },
+        "ES_GARCH_EVT": {
+            "Total Obs": 4531,
+            "Actual Breaches": 20,
+            "Breach Rate (%)": 0.4414036636504083,
+            "Mean Excess Beyond ES (%)": 0.8248064678015499,
+            "ES Calibration Discrepancy (%)": 0.11055885418274344
+        }
+    },
+    "regime_summary": {
+        "Calm (VIX < 20)": {
+            "Observations": 2863,
+            "VaR_Normal_Breaches": 22,
+            "VaR_Normal_Rate (%)": 0.7684247293049249,
+            "VaR_Normal_MeanExcess (%)": 0.4194843326224825,
+            "VaR_Historical_Breaches": 12,
+            "VaR_Historical_Rate (%)": 0.41914076143905,
+            "VaR_Historical_MeanExcess (%)": 0.4036041902906319,
+            "VaR_GARCH_EVT_Breaches": 17,
+            "VaR_GARCH_EVT_Rate (%)": 0.5937827453719874,
+            "VaR_GARCH_EVT_MeanExcess (%)": 0.490219669546143,
+            "ES_GARCH_EVT_Breaches": 6,
+            "ES_GARCH_EVT_Rate (%)": 0.209570380719525
+        },
+        "Normal (20 <= VIX < 30)": {
+            "Observations": 1233,
+            "VaR_Normal_Breaches": 57,
+            "VaR_Normal_Rate (%)": 4.622871046228711,
+            "VaR_Normal_MeanExcess (%)": 0.5445852833075758,
+            "VaR_Historical_Breaches": 29,
+            "VaR_Historical_Rate (%)": 2.3519870235198703,
+            "VaR_Historical_MeanExcess (%)": 0.4872273566852544,
+            "VaR_GARCH_EVT_Breaches": 16,
+            "VaR_GARCH_EVT_Rate (%)": 1.2976480129764802,
+            "VaR_GARCH_EVT_MeanExcess (%)": 0.5471666409651824,
+            "ES_GARCH_EVT_Breaches": 6,
+            "ES_GARCH_EVT_Rate (%)": 0.48661800486618007
+        },
+        "Crisis (VIX >= 30)": {
+            "Observations": 435,
+            "VaR_Normal_Breaches": 53,
+            "VaR_Normal_Rate (%)": 12.183908045977011,
+            "VaR_Normal_MeanExcess (%)": 2.032454732094869,
+            "VaR_Historical_Breaches": 37,
+            "VaR_Historical_Rate (%)": 8.505747126436782,
+            "VaR_Historical_MeanExcess (%)": 2.0634953934071145,
+            "VaR_GARCH_EVT_Breaches": 13,
+            "VaR_GARCH_EVT_Rate (%)": 2.9885057471264367,
+            "VaR_GARCH_EVT_MeanExcess (%)": 1.5395972542969383,
+            "ES_GARCH_EVT_Breaches": 8,
+            "ES_GARCH_EVT_Rate (%)": 1.839080459770115
+        },
+        "2008 GFC Shock": {
+            "Observations": 209,
+            "VaR_Normal_Breaches": 22,
+            "VaR_Normal_Rate (%)": 10.526315789473683,
+            "VaR_Normal_MeanExcess (%)": 1.807534317509942,
+            "VaR_Historical_Breaches": 13,
+            "VaR_Historical_Rate (%)": 6.220095693779904,
+            "VaR_Historical_MeanExcess (%)": 1.9635193810578038,
+            "VaR_GARCH_EVT_Breaches": 7,
+            "VaR_GARCH_EVT_Rate (%)": 3.349282296650718,
+            "VaR_GARCH_EVT_MeanExcess (%)": 2.075268303652261,
+            "ES_GARCH_EVT_Breaches": 5,
+            "ES_GARCH_EVT_Rate (%)": 2.3923444976076556
+        },
+        "2020 COVID Crash": {
+            "Observations": 52,
+            "VaR_Normal_Breaches": 13,
+            "VaR_Normal_Rate (%)": 25.0,
+            "VaR_Normal_MeanExcess (%)": 3.161683208223736,
+            "VaR_Historical_Breaches": 10,
+            "VaR_Historical_Rate (%)": 19.230769230769234,
+            "VaR_Historical_MeanExcess (%)": 3.261712506239574,
+            "VaR_GARCH_EVT_Breaches": 3,
+            "VaR_GARCH_EVT_Rate (%)": 5.769230769230769,
+            "VaR_GARCH_EVT_MeanExcess (%)": 0.9009932766186896,
+            "ES_GARCH_EVT_Breaches": 1,
+            "ES_GARCH_EVT_Rate (%)": 1.9230769230769231
+        }
+    },
+    "dirichlet_stats": {
+        "norm_mean": 1.72927847346452,
+        "norm_std": 0.08732213331937505,
+        "hist_mean": 1.0137149672033394,
+        "hist_std": 2.220446049250313e-16,
+        "evt_mean": 0.9194991055456171,
+        "evt_std": 0.09784618499878447
+    }
+}
