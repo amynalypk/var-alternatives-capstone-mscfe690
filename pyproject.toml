@@ -1,0 +1,8 @@
+[tool.pytest.ini_options]
+# The modules live at the repository root and import each other by bare name, so
+# the root has to be on the path for a test to import risk_models at all.
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "slow: needs the cached market data or a full walk-forward pass (deselect with -m 'not slow')",
+]
