@@ -1,4 +1,16 @@
+"""Observed regime and historical stress analysis for the portfolio.
 
+This module uses two transparent, observed classifications rather than a latent
+state model: lagged 20-day annualised portfolio realised-volatility terciles and
+lagged Yahoo Finance ``^VIX`` bands (calm, normal, and crisis). Portfolio
+cut-points are frozen from the initial 500-observation calibration period for
+leakage-controlled analysis; a full-sample balanced version is retained only as
+a descriptive comparison. The 2008 GFC and 2020 COVID intervals are historical
+date overlays, not additional mutually exclusive regimes. The outputs support
+regime-conditioned VaR/ES scoring, disagreement analysis, and sector
+attribution. HMM, copula, and volume-based liquidity regimes are outside this
+execution path.
+"""
 
 import numpy as np
 import pandas as pd
@@ -49,13 +61,22 @@ PORTFOLIO_COLUMN_BALANCED = "portfolio_regime_balanced"
 
 
 def lagged_realised_vol(portfolio_returns, window=PORTFOLIO_VOL_WINDOW):
-    
+    """Return annualised rolling volatility lagged before regime assignment.
+
+    Shifting the rolling estimate by one trading day ensures the return being
+    classified cannot influence its own portfolio-volatility label.
+    """
     return (portfolio_returns.rolling(window).std(ddof=1) * np.sqrt(252.0)).shift(1)
 
 
 def freeze_regime_cut_points(realised_vol, cal_days=PORTFOLIO_REGIME_CAL_DAYS,
                              n_bands=PORTFOLIO_REGIME_BANDS):
-    
+    """Estimate ordered volatility-band cut-points from an initial calibration.
+
+    The frozen definition uses only the first ``cal_days`` usable observations;
+    callers may pass the full sample to obtain the descriptive balanced
+    comparison. A minimum number of observations prevents unstable quantiles.
+    """
     cal = realised_vol.iloc[:cal_days].dropna()
     if len(cal) < n_bands * 10:
         raise ValueError(
@@ -67,6 +88,7 @@ def freeze_regime_cut_points(realised_vol, cal_days=PORTFOLIO_REGIME_CAL_DAYS,
 
 
 def classify_portfolios_regimes(realised_vol, cut_points):
+    """Map realised volatility to ordered low/mid/high bands."""
     labels = []
     for v in realised_vol:
         if pd.isna(v):
@@ -81,6 +103,7 @@ def classify_portfolios_regimes(realised_vol, cut_points):
 
 
 def classify_vix_regimes(vix, calm=VIX_CALM_THRESHOLD, crisis=VIX_CRISIS_THRESHOLD):
+    """Label an external VIX level as calm (<20), normal, or crisis (>=30)."""
     out = pd.Series(None, index=vix.index, name="vix_regime", dtype=object)
     out[vix < calm] = VIX_REGIME_LABELS[0]
     out[(vix >= calm) & (vix < crisis)] = VIX_REGIME_LABELS[1]
@@ -91,7 +114,12 @@ def classify_vix_regimes(vix, calm=VIX_CALM_THRESHOLD, crisis=VIX_CRISIS_THRESHO
 def build_regime_frame(returns_df, vol_window=PORTFOLIO_VOL_WINDOW,
                        cal_days=PORTFOLIO_REGIME_CAL_DAYS,
                        n_bands=PORTFOLIO_REGIME_BANDS):
-    
+    """Build aligned portfolio-volatility and lagged-VIX regime labels.
+
+    The returned frame keeps both frozen and full-sample portfolio terciles so
+    leakage-controlled scoring can be distinguished from descriptive agreement
+    analysis. VIX is lagged because it is used as an information-available proxy.
+    """
     port = returns_df["Portfolio"]
     rv = lagged_realised_vol(port, window=vol_window)
     frozen = freeze_regime_cut_points(rv, cal_days=cal_days, n_bands=n_bands)
@@ -116,7 +144,7 @@ def _to_ordinal(series, labels):
 
 
 def agreement_table(regime_frame, portfolio_column=PORTFOLIO_COLUMN_BALANCED):
-    
+    """Compare ordered portfolio-volatility and VIX labels after relabelling."""
     sub = regime_frame.dropna(subset=[portfolio_column, "vix_regime"])
     a = _to_ordinal(sub[portfolio_column], PORTFOLIO_REGIME_LABELS).to_numpy()
     b = _to_ordinal(sub["vix_regime"], VIX_REGIME_LABELS).to_numpy()
@@ -139,7 +167,7 @@ def cross_tab_with_breach_rates(regime_frame, sweep_frame, innovation_dist=PRIMA
                                 threshold_q=PRIMARY_POT_THRESHOLD_QUANTILE,
                                 confidence_level=PRIMARY_CONFIDENCE,
                                 portfolio_column=PORTFOLIO_COLUMN_BALANCED):
-    
+    """Return the 3x3 portfolio-volatility by VIX breach-rate table."""
     sel = sweep_frame[(sweep_frame["innovation_dist"] == innovation_dist)
                       & (sweep_frame["threshold_q"] == threshold_q)
                       & (sweep_frame["confidence_level"] == confidence_level)]
@@ -175,7 +203,12 @@ def regime_conditional_performance(regime_frame, sweep_frame,
                                    threshold_q=PRIMARY_POT_THRESHOLD_QUANTILE,
                                    confidence_level=PRIMARY_CONFIDENCE,
                                    notional=None):
-    
+    """Score the primary forecasts within observed regimes and crisis overlays.
+
+    VIX and portfolio-volatility labels form the partitions; the configured GFC
+    and COVID periods are date overlays and therefore are reported separately,
+    not added to or summed with the partition rows.
+    """
     sel = sweep_frame[(sweep_frame["innovation_dist"] == innovation_dist)
                       & (sweep_frame["threshold_q"] == threshold_q)
                       & (sweep_frame["confidence_level"] == confidence_level)]
@@ -232,14 +265,14 @@ def regime_conditional_performance(regime_frame, sweep_frame,
 
 
 def regime_gap(joined_frame, portfolio_column=PORTFOLIO_COLUMN_BALANCED):
-    
+    """Return the ordinal portfolio-versus-VIX regime gap for each day."""
     sub = joined_frame.dropna(subset=[portfolio_column, "vix_regime"])
     return (_to_ordinal(sub[portfolio_column], PORTFOLIO_REGIME_LABELS)
             - _to_ordinal(sub["vix_regime"], VIX_REGIME_LABELS))
 
 
 def disagreement_register(joined_frame, portfolio_column=PORTFOLIO_COLUMN_BALANCED):
-    
+    """Summarise days when portfolio and broad-market stress labels diverge."""
     sub = joined_frame.dropna(subset=[portfolio_column, "vix_regime", "VaR_GARCH_EVT"]).copy()
     sub["gap"] = regime_gap(sub, portfolio_column)
 
@@ -268,7 +301,7 @@ def disagreement_register(joined_frame, portfolio_column=PORTFOLIO_COLUMN_BALANC
 
 
 def sector_contribution(returns_df, dates, tickers=None):
-    
+    """Attribute selected portfolio days to sector-level return differences."""
     tickers = TICKERS if tickers is None else tickers
     weights = {}
     for t in tickers:
@@ -305,7 +338,7 @@ def model_ranking_by_regime(baseline_frame, sweep_frame, regime_frame,
                             threshold_q=PRIMARY_POT_THRESHOLD_QUANTILE,
                             confidence_level=PRIMARY_CONFIDENCE,
                             portfolio_column=PORTFOLIO_COLUMN_BALANCED):
-    
+    """Compare Gaussian, historical, and GARCH-EVT VaR within regimes."""
     sel = sweep_frame[(sweep_frame["innovation_dist"] == innovation_dist)
                       & (sweep_frame["threshold_q"] == threshold_q)
                       & (sweep_frame["confidence_level"] == confidence_level)]

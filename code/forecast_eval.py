@@ -1,4 +1,12 @@
+"""Forecast scoring helpers for out-of-sample VaR and ES evaluation.
 
+The primary evaluator uses positive loss magnitudes and treats a forecast as
+breached only when ``loss > VaR``.  It combines exception-frequency,
+independence, exact-binomial-interval, and excess-loss diagnostics.  The
+module deliberately does not implement general forecast-loss scores, a
+Diebold--Mariano test, or a Model Confidence Set procedure; the submitted
+comparison path uses coverage and economic-impact measures instead.
+"""
 
 import numpy as np
 
@@ -9,7 +17,45 @@ from config import CLOPPER_PEARSON_ALPHA, NOTIONAL_USD
 
 def score_forecasts(losses, var_forecasts, confidence_level, es_forecasts=None,
                     notional=NOTIONAL_USD):
-    
+    """Score positive-loss forecasts against realized losses.
+
+    Parameters
+    ----------
+    losses : array-like
+        Realized positive loss magnitudes, normally ``-Return``.
+    var_forecasts : array-like
+        One-step-ahead VaR loss forecasts at ``confidence_level``.  Rows with
+        missing VaR are excluded from the scored sample and counted in the
+        ``Dropped NaN Forecasts`` result.
+    confidence_level : float
+        VaR confidence level.  The nominal exception probability is
+        ``1 - confidence_level``.
+    es_forecasts : array-like, optional
+        Optional Expected Shortfall forecasts aligned to the input arrays.  ES
+        diagnostics use the same rows retained by the VaR mask.
+    notional : float, default=NOTIONAL_USD
+        Portfolio value used to express excess losses in currency units.
+
+    Returns
+    -------
+    dict
+        Counts, breach rate, mean/median/maximum VaR, Kupiec unconditional
+        coverage and Christoffersen independence/conditional-coverage
+        statistics, exact 95% Clopper--Pearson interval, and percentage/USD
+        excess-loss measures.  With ES supplied, the dictionary also includes
+        ES breaches, mean ES, the ES--VaR spread in basis points, and the mean
+        loss beyond ES on VaR-breach days.
+
+    Notes
+    -----
+    A breach is strictly ``loss > VaR``; a tie is not an exception.  The
+    function filters missing VaR forecasts, but does not independently filter
+    missing losses or validate missing/misaligned ES values.  Callers should
+    align and validate those arrays before scoring.  Empty scored samples and
+    zero-breach samples return zero-valued rate/severity summaries where the
+    underlying helper permits it; the coverage-test behavior is inherited from
+    ``christoffersen_test`` and ``clopper_pearson``.
+    """
     losses = np.asarray(losses, dtype=float)
     var_forecasts = np.asarray(var_forecasts, dtype=float)
     keep = ~np.isnan(var_forecasts)

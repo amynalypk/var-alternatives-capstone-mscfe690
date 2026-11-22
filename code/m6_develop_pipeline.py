@@ -1,5 +1,6 @@
 
 
+"""Build the Module 6 metrics manifest and supporting analytical sections."""
 import argparse
 import datetime as _dt
 import json
@@ -91,12 +92,14 @@ NULL_MEANINGS = {
 
 def _field_of(path):
     
+    """Compute or assemble the _field_of result used by the m6_develop_pipeline analysis."""
     leaf = path.rsplit(".", 1)[-1]
     return leaf.split("[")[0]
 
 
 def _explain_nulls(manifest):
     
+    """Compute or assemble the _explain_nulls result used by the m6_develop_pipeline analysis."""
     fields = sorted({_field_of(path) for path in manifest["non_finite_paths"]})
     unexplained = [field for field in fields if field not in NULL_MEANINGS]
     if unexplained:
@@ -113,6 +116,7 @@ def _explain_nulls(manifest):
 
 def _scalar(v, nan_to_none=False):
     
+    """Compute or assemble the _scalar result used by the m6_develop_pipeline analysis."""
     if isinstance(v, (np.generic,)):
         v = v.item()
     if isinstance(v, (pd.Timestamp, _dt.datetime, _dt.date)):
@@ -136,11 +140,13 @@ def _scalar(v, nan_to_none=False):
 
 
 def to_jsonable(obj, nan_to_none=False):
+    """Compute or assemble the to_jsonable result used by the m6_develop_pipeline analysis."""
     return _scalar(obj, nan_to_none)
 
 
 def _find_non_finite(node, path="$", hits=None):
     
+    """Compute or assemble the _find_non_finite result used by the m6_develop_pipeline analysis."""
     if hits is None:
         hits = []
     if node is None or (isinstance(node, float) and not np.isfinite(node)):
@@ -155,13 +161,16 @@ def _find_non_finite(node, path="$", hits=None):
 
 
 def _cached(ctx, key, factory):
+    """Compute or assemble the _cached result used by the m6_develop_pipeline analysis."""
     if key not in ctx:
         ctx[key] = factory()
     return ctx[key]
 
 
 def _load_sweeps(ctx):
+    """Compute or assemble the _load_sweeps result used by the m6_develop_pipeline analysis."""
     def build():
+        """Compute or assemble the build result used by the m6_develop_pipeline analysis."""
         try:
             return load_multi_config_cache()
         except FileNotFoundError:
@@ -177,7 +186,9 @@ def _load_sweeps(ctx):
 
 def _primary_slice(ctx, recursion):
     
+    """Compute or assemble the _primary_slice result used by the m6_develop_pipeline analysis."""
     def build():
+        """Compute or assemble the build result used by the m6_develop_pipeline analysis."""
         frame = _load_sweeps(ctx)[recursion]
         sub = slice_config(frame, PRIMARY_GARCH_INNOVATION_DISTRIBUTION,
                            PRIMARY_POT_THRESHOLD_QUANTILE, PRIMARY_CONFIDENCE)
@@ -190,6 +201,7 @@ def _primary_slice(ctx, recursion):
 
 
 def section_data(ctx):
+    """Compute or assemble the section_data result used by the m6_develop_pipeline analysis."""
     returns = ctx["returns_df"]
     n_test = len(ctx["portfolio"]) - ROLLING_WINDOW
     observed_refits = int(_load_sweeps(ctx)["corrected"]
@@ -228,11 +240,13 @@ def section_data(ctx):
 
 def _read_table(path):
     
+    """Compute or assemble the _read_table result used by the m6_develop_pipeline analysis."""
     return pd.read_csv(path).rename(columns={"Unnamed: 0": "metric"})
 
 
 def section_runtime(ctx):
     
+    """Compute or assemble the section_runtime result used by the m6_develop_pipeline analysis."""
     if not os.path.exists(rb.BENCH_CACHE_MODEL_COSTS):
         payload = rb.run_runtime_benchmarks(ctx["portfolio"])
     else:
@@ -258,6 +272,7 @@ def section_runtime(ctx):
 
 def section_recursion(ctx):
     
+    """Compute or assemble the section_recursion result used by the m6_develop_pipeline analysis."""
     baseline = ctx["baseline"]
     frames = {recursion: _cached(ctx, f"wf_{recursion}",
                                  lambda r=recursion: run_walk_forward_backtest(
@@ -307,6 +322,7 @@ def section_recursion(ctx):
 
 def section_headline(ctx):
     
+    """Compute or assemble the section_headline result used by the m6_develop_pipeline analysis."""
     baseline = ctx["baseline"]
     perf = evaluate_risk_model_performance(baseline, PRIMARY_CONFIDENCE)
     x = int((baseline["Loss"] > baseline["VaR_GARCH_EVT"]).sum())
@@ -335,6 +351,7 @@ def section_headline(ctx):
 
 def section_threshold(ctx):
     
+    """Compute or assemble the section_threshold result used by the m6_develop_pipeline analysis."""
     out = {"per_innovation": {}, "grid": list(POT_THRESHOLD_QUANTILES),
            "production_q": PRIMARY_POT_THRESHOLD_QUANTILE}
     for dist in GARCH_INNOVATION_DISTRIBUTIONS:
@@ -370,6 +387,7 @@ def section_threshold(ctx):
 
 def section_iid(ctx):
     
+    """Compute or assemble the section_iid result used by the m6_develop_pipeline analysis."""
     portfolio = ctx["portfolio"]
     diagnostics = ra.innovation_diagnostics_table(portfolio)
     walk_forward = ra.walk_forward_filter_table(_load_sweeps(ctx)["corrected"], portfolio,
@@ -387,6 +405,7 @@ def section_iid(ctx):
 
 def section_regime(ctx):
     
+    """Compute or assemble the section_regime result used by the m6_develop_pipeline analysis."""
     frame, cut_points = build_regime_frame(ctx["returns_df"])
     sweep = _load_sweeps(ctx)["corrected"]
     tab11, joined = cross_tab_with_breach_rates(frame, sweep)
@@ -416,6 +435,7 @@ def section_regime(ctx):
 
 def section_economic(ctx):
     
+    """Compute or assemble the section_economic result used by the m6_develop_pipeline analysis."""
     baseline = ctx["baseline"]
     comparison = model_economic_comparison(baseline, notional=NOTIONAL_USD)
     registers = registers_by_model(baseline, notional=NOTIONAL_USD)
@@ -468,6 +488,7 @@ def section_economic(ctx):
 
 def section_optimisation(ctx):
     
+    """Compute or assemble the section_optimisation result used by the m6_develop_pipeline analysis."""
     out = _cached(ctx, "optimisation", lambda: run_optimisation(
         returns_df=ctx["returns_df"], write_cache=True))
     reduction = out["es_reduction"]
@@ -512,6 +533,7 @@ def section_optimisation(ctx):
 
 def section_optimisation_control(ctx):
     
+    """Compute or assemble the section_optimisation_control result used by the m6_develop_pipeline analysis."""
     out = run_optimisation(returns_df=ctx["returns_df"], quick=True, write_cache=False)
     return {
         "universe": out["tickers"],
@@ -526,6 +548,7 @@ def section_optimisation_control(ctx):
 
 def section_weight_robustness(ctx):
     
+    """Compute or assemble the section_weight_robustness result used by the m6_develop_pipeline analysis."""
     res = run_dirichlet_robustness_test(ctx["returns_df"], TICKERS,
                                         n_simulations=DIRICHLET_SIMULATIONS,
                                         confidence_level=PRIMARY_CONFIDENCE)
@@ -546,6 +569,7 @@ def section_weight_robustness(ctx):
 
 def section_pointers(ctx):
     
+    """Compute or assemble the section_pointers result used by the m6_develop_pipeline analysis."""
     return {
         "Table 1": "static in the report generator (reviewer response matrix)",
         "Table 2": "static in the report generator (revised objectives)",
@@ -604,6 +628,7 @@ SECTIONS = [
 
 
 def build_context():
+    """Compute or assemble the build_context result used by the m6_develop_pipeline analysis."""
     returns_df = process_returns(fetch_and_cache_data())
     return {
         "returns_df": returns_df,
@@ -616,6 +641,7 @@ def build_context():
 def run_module6_pipeline(force=False, only=None, write_manifest=True,
                          verbose=True):
     
+    """Compute or assemble the run_module6_pipeline result used by the m6_develop_pipeline analysis."""
     t_start = time.perf_counter()
     ctx = build_context()
     names = [name for name, _ in SECTIONS]
@@ -701,11 +727,13 @@ def run_module6_pipeline(force=False, only=None, write_manifest=True,
 
 
 def datetime_now():
+    """Compute or assemble the datetime_now result used by the m6_develop_pipeline analysis."""
     return _dt.datetime.now().isoformat(timespec="seconds")
 
 
 def _show(value, spec="{:.4f}"):
     
+    """Compute or assemble the _show result used by the m6_develop_pipeline analysis."""
     if value is None:
         return "not run"
     if isinstance(value, float) and not np.isfinite(value):
@@ -717,6 +745,7 @@ def _show(value, spec="{:.4f}"):
 
 
 def print_summary(manifest):
+    """Compute or assemble the print_summary result used by the m6_develop_pipeline analysis."""
     headline = manifest.get("headline", {}).get("module6_primary", {})
     recursion = manifest.get("recursion", {})
     reproduction = recursion.get("m4_reproduction", {})

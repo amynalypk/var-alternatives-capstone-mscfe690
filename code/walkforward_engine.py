@@ -1,5 +1,6 @@
 
 
+"""Run multi-configuration walk-forward GARCH-EVT forecasts and cache the sweep."""
 import os
 import time
 
@@ -27,6 +28,7 @@ OUTPUT_COLUMNS = [
 
 def _valid_configurations(threshold_quantiles, confidence_levels):
     
+    """Compute or assemble the _valid_configurations result used by the walkforward_engine analysis."""
     valid, skipped = [], []
     for q in threshold_quantiles:
         for alpha in confidence_levels:
@@ -39,6 +41,7 @@ def _valid_configurations(threshold_quantiles, confidence_levels):
 
 def _fit_gpd_states(std_resid, threshold_quantiles, confidence_levels):
     
+    """Compute or assemble the _fit_gpd_states result used by the walkforward_engine analysis."""
     states = {}
     for q in threshold_quantiles:
         diag = fit_evt_pot_diag(std_resid, q, min_exceedances=10)
@@ -78,6 +81,7 @@ def run_multi_config_walk_forward(portfolio_returns, vix_series=None,
                                   cache_path=_DEFAULT_CACHE_PATH,
                                   force=False):
     
+    """Compute or assemble the run_multi_config_walk_forward result used by the walkforward_engine analysis."""
     if variance_recursion not in ("legacy", "corrected"):
         raise ValueError(f"unknown variance_recursion: {variance_recursion}")
     if cache_path is _DEFAULT_CACHE_PATH:
@@ -184,6 +188,7 @@ def run_multi_config_walk_forward(portfolio_returns, vix_series=None,
 
 def load_multi_config_cache(force=False):
     
+    """Compute or assemble the load_multi_config_cache result used by the walkforward_engine analysis."""
     out = {}
     for variant, path in (("corrected", M6_WALK_FORWARD_CACHE),
                           ("legacy", M6_WALK_FORWARD_CACHE_LEGACY)):
@@ -198,6 +203,7 @@ def load_multi_config_cache(force=False):
 
 def slice_config(frame, innovation_dist, threshold_q, confidence_level):
     
+    """Compute or assemble the slice_config result used by the walkforward_engine analysis."""
     mask = (
         (frame["innovation_dist"] == innovation_dist)
         & (frame["threshold_q"] == threshold_q)
@@ -213,6 +219,7 @@ def slice_config(frame, innovation_dist, threshold_q, confidence_level):
 
 def summarise_sweep(frame):
     
+    """Compute or assemble the summarise_sweep result used by the walkforward_engine analysis."""
     work = frame.copy()
     work["xi_negative"] = work["xi_raw"] < 0
     work["xi_se_missing"] = ~np.isfinite(work["xi_se"])

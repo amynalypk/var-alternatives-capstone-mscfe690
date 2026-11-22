@@ -1,5 +1,6 @@
 
 
+"""Provide tail-coverage intervals and breach-register summaries."""
 import numpy as np
 import pandas as pd
 from scipy.stats import beta as _beta
@@ -7,6 +8,7 @@ from scipy.stats import beta as _beta
 
 def clopper_pearson(exceptions, total_obs, alpha=0.05):
     
+    """Compute or assemble the clopper_pearson result used by the tail_metrics analysis."""
     if total_obs <= 0:
         raise ValueError("total_obs must be positive")
     if not 0 <= exceptions <= total_obs:
@@ -19,6 +21,7 @@ def clopper_pearson(exceptions, total_obs, alpha=0.05):
 
 def clopper_pearson_contains(nominal_rate, exceptions, total_obs, alpha=0.05):
     
+    """Compute or assemble the clopper_pearson_contains result used by the tail_metrics analysis."""
     low, high = clopper_pearson(exceptions, total_obs, alpha)
     return bool(low <= nominal_rate <= high), low, high
 
@@ -30,6 +33,7 @@ REGISTER_COLUMNS = ["Return", "Loss", "VaR", "Exceedance", "Exceedance_bps",
 def build_breach_register(index, losses, var_forecasts, returns=None,
                           es_forecasts=None, notional=0.0):
     
+    """Compute or assemble the build_breach_register result used by the tail_metrics analysis."""
     losses = np.asarray(losses, dtype=float)
     var_forecasts = np.asarray(var_forecasts, dtype=float)
     forecast_present = ~np.isnan(var_forecasts) & ~np.isnan(losses)
@@ -68,6 +72,7 @@ def build_breach_register(index, losses, var_forecasts, returns=None,
 
 def describe_excess_losses(excess, notional=0.0):
     
+    """Compute or assemble the describe_excess_losses result used by the tail_metrics analysis."""
     excess = np.asarray(excess, dtype=float)
     if excess.size == 0:
         return {

@@ -1,4 +1,17 @@
+"""Scenario-based portfolio allocation and risk optimisation.
 
+The module builds aligned conditional return scenarios from asset-level forecasts,
+then compares constrained allocation rules.  The primary optimiser minimises
+empirical Expected Shortfall (also called historical CVaR) with a linear
+programme.  All portfolios are fully invested and long-only; the configured
+single-name cap prevents concentration.  Optional turnover and expected-return
+constraints support the dynamic-book analysis in ``dynamic_portfolio.py``.
+
+The minimum-variance functions are benchmark allocations, not risk-parity
+implementations: no marginal-risk-contribution or equal-risk-contribution
+solver is included in this deliverable.  Scenario and covariance estimates are
+empirical; they are not fitted copula models.
+"""
 
 import numpy as np
 import pandas as pd
@@ -13,7 +26,13 @@ LP_SUCCESS_STATUSES = (0,)
 
 
 def build_scenarios(mu, sigma, z_window):
-    
+    """Create aligned conditional asset-return scenarios.
+
+    Each row is ``mu + z * sigma`` for the asset forecasts and one aligned
+    standardised-residual row.  Rows with any missing asset are removed rather
+    than independently imputed, preserving cross-asset dependence in each
+    historical scenario.
+    """
     mu = np.asarray(mu, dtype=float).ravel()
     sigma = np.asarray(sigma, dtype=float).ravel()
     z = np.asarray(z_window, dtype=float)
@@ -30,12 +49,12 @@ def build_scenarios(mu, sigma, z_window):
 
 
 def portfolio_losses(weights, scenarios):
-    
+    """Return positive portfolio losses as the negative weighted returns."""
     return -np.asarray(scenarios, dtype=float) @ np.asarray(weights, dtype=float).ravel()
 
 
 def empirical_es(weights, scenarios, alpha=PRIMARY_ES_LP_ALPHA):
-    
+    """Evaluate discrete scenario Expected Shortfall for a weight vector."""
     losses = portfolio_losses(weights, scenarios)
     tail_weight = 1.0 / ((1.0 - alpha) * losses.size)
     candidates = np.unique(losses)
@@ -46,7 +65,17 @@ def empirical_es(weights, scenarios, alpha=PRIMARY_ES_LP_ALPHA):
 def min_es_lp(scenarios, alpha=PRIMARY_ES_LP_ALPHA, min_weight=MIN_ASSET_WEIGHT,
               max_weight=MAX_ASSET_WEIGHT, w_prev=None, turnover_cap=None,
               expected_returns=None, return_floor=None):
-    
+    """Solve the constrained minimum empirical ES/CVaR allocation.
+
+    For scenario losses ``L_k = -r_k @ w``, the linear programme minimises
+    ``t + sum(u_k) / ((1-alpha) * K)`` subject to ``u_k >= L_k - t`` and
+    ``u_k >= 0``.  The asset weights satisfy full investment and configured
+    long-only bounds, normally including the 15% maximum single-asset cap.
+    ``turnover_cap`` measures one-way repositioning from ``w_prev`` and
+    ``return_floor`` constrains the forecast-return dot product.  Failed solves
+    are returned as structured diagnostics instead of silently using equal
+    weights.  ``empirical_es_check`` independently evaluates the solution.
+    """
     scenarios = np.asarray(scenarios, dtype=float)
     k, n = scenarios.shape
     if not 0 < alpha < 1:
@@ -140,7 +169,12 @@ def min_es_lp(scenarios, alpha=PRIMARY_ES_LP_ALPHA, min_weight=MIN_ASSET_WEIGHT,
 def min_variance_weights(cov, min_weight=MIN_ASSET_WEIGHT, max_weight=MAX_ASSET_WEIGHT,
                          w_prev=None, turnover_cap=None, expected_returns=None,
                          return_floor=None):
-    
+    """Solve a bounded minimum-variance benchmark with optional constraints.
+
+    ``cov`` may be the sample scenario covariance or Ledoit-Wolf shrinkage
+    covariance.  This is not risk parity: it minimises portfolio variance and
+    does not equalise marginal risk contributions.
+    """
     cov = np.asarray(cov, dtype=float)
     n = cov.shape[0]
     x0 = np.full(n, 1.0 / n)
@@ -204,6 +238,7 @@ def concentration_report(weights):
 
 
 def mean_off_diagonal_correlation(matrix):
+    """Return mean pairwise correlation; this is not copula estimation."""
     corr = np.asarray(pd.DataFrame(matrix).corr().to_numpy(), dtype=float)
     upper = corr[np.triu_indices(corr.shape[0], 1)]
     return float(np.nanmean(upper))

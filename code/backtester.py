@@ -1,3 +1,19 @@
+"""Out-of-sample risk-model backtesting and portfolio robustness diagnostics.
+
+The primary walk-forward engine compares Gaussian and Historical Simulation VaR
+with one-step-ahead GARCH-EVT VaR and Expected Shortfall (ES).  Each forecast
+uses a fixed-length rolling calibration window and is scored against the next
+realized portfolio loss.  The module also provides Kupiec and Christoffersen
+exception tests, regime-conditioned summaries, breach registers, and the
+Dirichlet randomized-portfolio robustness panel used by the capstone pipeline.
+
+Risk forecasts are positive loss magnitudes.  Returns retain their usual sign,
+so a realized observation is an exception when ``Loss = -Return`` is strictly
+greater than the relevant forecast.  The corrected variance recursion is the
+production path; the legacy path is retained only to reproduce the earlier
+Module 4 results for comparison.
+"""
+
 import numpy as np
 import pandas as pd
 from scipy.stats import chi2
@@ -14,6 +30,13 @@ from risk_models import (
 from tail_metrics import clopper_pearson, build_breach_register
 
 def kupiec_pof_test(exceptions, total_obs, confidence_level=0.99):
+    """Test whether the exception count matches the nominal VaR rate.
+
+    Parameters are the observed number of exceptions, total scored
+    observations, and VaR confidence level.  The nominal exception probability
+    is ``1 - confidence_level``.  Returns the unconditional-coverage
+    likelihood-ratio statistic and its chi-square(1) p-value.
+    """
     p = 1.0 - confidence_level
     x = exceptions
     n = total_obs
@@ -39,6 +62,14 @@ def kupiec_pof_test(exceptions, total_obs, confidence_level=0.99):
     return float(lr_uc), float(p_value)
 
 def christoffersen_test(exceptions_series, confidence_level=0.99):
+    """Evaluate exception independence and conditional coverage.
+
+    The input is a binary exception sequence.  The returned dictionary
+    contains unconditional-coverage, independence, and combined
+    conditional-coverage likelihood-ratio statistics and p-values, plus
+    transition counts in ``(t00, t01, t10, t11)`` order.  Zero-probability
+    transition cases use finite limiting likelihood values.
+    """
     e = np.asarray(exceptions_series, dtype=int)
     n = len(e)
     x = int(np.sum(e))
@@ -80,7 +111,24 @@ def run_walk_forward_backtest(portfolio_returns, vix_series=None, confidence_lev
                               innovation_dist=PRIMARY_GARCH_INNOVATION_DISTRIBUTION,
                               threshold_quantile=POT_THRESHOLD_QUANTILE,
                               variance_recursion=VARIANCE_RECURSION):
-    
+    """Generate one-step-ahead rolling forecasts for a portfolio return series.
+
+    The first forecast uses the preceding ``window`` observations (500 trading
+    days by default); the fixed-length window then advances one day at a time,
+    so the output has ``len(portfolio_returns) - window`` out-of-sample rows.
+    GARCH and EVT parameters are refit on the first day and every configured
+    refit interval thereafter (20 observations by default).  Between refits,
+    the cached parameters are used and the conditional variance state advances.
+
+    At each step the realized return at the forecast date is held out until
+    after forecasts are created.  This ordering approximates deployment-time
+    information availability and prevents future observations entering the
+    calibration window.  ``Loss = -Return``; a breach is strictly
+    ``Loss > forecast``.  The returned frame contains realized values and
+    Normal, Historical, GARCH-EVT VaR, and GARCH-EVT ES forecasts, with an
+    optional aligned ``VIX`` column.  Model-fitting errors propagate rather
+    than being silently dropped or imputed.
+    """
     if variance_recursion not in ("legacy", "corrected"):
         raise ValueError(f"unknown variance_recursion: {variance_recursion}")
 
@@ -169,7 +217,12 @@ def run_walk_forward_backtest(portfolio_returns, vix_series=None, confidence_lev
 
 def compute_breach_register(results_df, model_col="VaR_GARCH_EVT", es_col="ES_GARCH_EVT",
                             notional=NOTIONAL_USD):
-    
+    """Build a dated exception register from a scored backtest frame.
+
+    ``Loss > model_col`` identifies exceptions; optional returns and ES
+    forecasts are passed through so the register can include signed returns,
+    tail forecasts, and notional-scaled excess-loss measures.
+    """
     return build_breach_register(
         results_df.index, results_df["Loss"].to_numpy(), results_df[model_col].to_numpy(),
         returns=results_df["Return"].to_numpy() if "Return" in results_df else None,
@@ -178,6 +231,15 @@ def compute_breach_register(results_df, model_col="VaR_GARCH_EVT", es_col="ES_GA
     )
 
 def evaluate_risk_model_performance(results_df, confidence_level=0.99):
+    """Summarize coverage, clustering, excess losses, and reserve amounts.
+
+    Exception counts use the strict ``Loss > VaR`` rule.  Kupiec and
+    Christoffersen statistics are reported for each VaR model, together with
+    exact Clopper-Pearson intervals and excess losses calculated only on
+    exception rows.  Empty exception sets receive zero-valued excess metrics.
+    The ES block separately reports direct ES exceedances and the mean
+    difference between realized losses and ES on VaR-breach days.
+    """
     n_obs = len(results_df)
     models = ['VaR_Normal', 'VaR_Historical', 'VaR_GARCH_EVT']
     perf_summary = {}
@@ -244,7 +306,13 @@ def evaluate_risk_model_performance(results_df, confidence_level=0.99):
     return perf_summary
 
 def segment_performance_by_regimes(results_df, confidence_level=0.99):
-    
+    """Report exception rates and excess losses within VIX/date regimes.
+
+    VIX bands are mutually exclusive partitions when present; the fixed 2008
+    GFC and 2020 COVID windows are named event overlays and may overlap those
+    bands.  Returns an empty dictionary when the scored frame has no ``VIX``
+    column.
+    """
     if 'VIX' not in results_df:
         return {}
 
@@ -283,6 +351,17 @@ def segment_performance_by_regimes(results_df, confidence_level=0.99):
     return regime_summary
 
 def run_dirichlet_robustness_test(returns_df, tickers, n_simulations=DIRICHLET_SIMULATIONS, confidence_level=0.99):
+    """Compare breach rates across seeded random long-only portfolios.
+
+    Each weight vector is drawn from a Dirichlet distribution, so weights are
+    non-negative and sum to one. This is a composition-robustness check for the
+    three VaR models, not the production equal-weight portfolio or an optimizer.
+
+    Weights are drawn from a Dirichlet distribution and each simulated
+    portfolio is scored against its own historical return series.  Returns a
+    dictionary containing one breach-rate list per model; the configured seed
+    makes repeated panels reproducible.
+    """
     print(f"[Robustness] Running {n_simulations} Dirichlet randomized portfolio simulations...")
     np.random.seed(RANDOM_SEED)
     k = len(tickers)

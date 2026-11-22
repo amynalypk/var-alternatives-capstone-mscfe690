@@ -1,3 +1,4 @@
+"""Execute the Module 4 core data, risk, backtest, and figure pipeline."""
 import os
 import sys
 import json
@@ -28,6 +29,7 @@ from visualizations import (
 )
 
 def run_module4_pipeline():
+    """Compute or assemble the run_module4_pipeline result used by the m4_core_assets analysis."""
     print("=" * 80)
     print("  MSCFE 690 CAPSTONE PROJECT - MODULE 4: CORE ASSETS PIPELINE")
     print("  Topic 3: Developing Alternatives to Value-at-Risk (VaR)")

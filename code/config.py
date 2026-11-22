@@ -1,3 +1,4 @@
+"""Centralise analysis paths, universe settings, model parameters, and reproducibility controls."""
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -75,13 +76,16 @@ PRIMARY_GARCH_INNOVATION_DISTRIBUTION = "normal"
 VARIANCE_RECURSION = "corrected"
 
 
-PORTFOLIO_VOL_WINDOW = 20          
-PORTFOLIO_REGIME_BANDS = 3         
-PORTFOLIO_REGIME_CAL_DAYS = 500    
+# Regime labels use lagged 20-day annualised realised portfolio volatility.
+# Three terciles are cut from the first 500 observations for the frozen,
+# leakage-controlled definition; a full-sample descriptive comparison is also
+# retained by the regime module.
+PORTFOLIO_VOL_WINDOW = 20
+PORTFOLIO_REGIME_BANDS = 3
+PORTFOLIO_REGIME_CAL_DAYS = 500
 
-
-
-
+# Historical stress windows are date overlays, not additional regime bands or
+# mutually exclusive partitions. Their endpoints are inclusive in scoring.
 STRESS_WINDOWS = (("2008 GFC", "2008-09-01", "2009-06-30"),
                   ("2020 COVID", "2020-02-15", "2020-04-30"))
 
@@ -124,6 +128,7 @@ M6_METRICS_MANIFEST = os.path.join(DATA_DIR, "module6_metrics_manifest.json")
 
 def validate_pot_configuration(threshold_quantile, confidence_level):
     
+    """Compute or assemble the validate_pot_configuration result used by the config analysis."""
     if not threshold_quantile < confidence_level:
         raise ValueError(
             f"POT threshold quantile {threshold_quantile} must be strictly "

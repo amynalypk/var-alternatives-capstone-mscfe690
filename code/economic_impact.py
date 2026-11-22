@@ -1,4 +1,11 @@
+"""Economic interpretation of VaR/ES exceptions and reserve adequacy.
 
+The functions convert positive loss forecasts and realized losses into breach
+magnitudes, dated registers, concentration measures, and reserve comparisons.
+Percentage excesses are scaled by the configured portfolio notional; they are
+not new return estimates.  Reserve balances are stocks held at each mark,
+whereas cumulative unreserved losses are realized flows on breach days.
+"""
 
 import numpy as np
 import pandas as pd
@@ -14,7 +21,14 @@ from tail_metrics import (
 def economic_summary(losses, var_forecasts, confidence_level=PRIMARY_CONFIDENCE,
                      notional=NOTIONAL_USD, es_forecasts=None, returns=None,
                      label="GARCH-EVT"):
-    
+    """Summarize exception frequency and monetary VaR shortfall.
+
+    Rows with missing losses or VaR forecasts are excluded.  A strict
+    ``loss > VaR`` exception contributes ``loss - VaR`` to percentage and USD
+    excess measures; a tie is not a breach.  The exact Clopper--Pearson
+    interval describes exception-rate uncertainty.  Optional ES fields are
+    calculated on the same retained rows.
+    """
     losses = np.asarray(losses, dtype=float)
     var_forecasts = np.asarray(var_forecasts, dtype=float)
     keep = ~np.isnan(var_forecasts) & ~np.isnan(losses)
@@ -56,12 +70,17 @@ def economic_summary(losses, var_forecasts, confidence_level=PRIMARY_CONFIDENCE,
 
 
 def worst_breaches(register, n=10):
-    
+    """Return the first ``n`` rows of an excess-sorted breach register."""
     return register.head(n).copy()
 
 
 def concentration(register, top_k=(1, 5, 10)):
-    
+    """Measure how concentrated USD excess losses are among breaches.
+
+    Returns total excess, breach count, top-k shares, the largest excess, and
+    the Herfindahl--Hirschman Index.  Empty or zero-total registers return
+    ``NaN`` shares because concentration is undefined without excess loss.
+    """
     total = float(register["USD_Excess"].sum())
     out = {"total_usd_excess": total, "n_breaches": int(len(register))}
     if total <= 0 or register.empty:
@@ -77,7 +96,15 @@ def concentration(register, top_k=(1, 5, 10)):
 
 def reserve_adequacy(losses, var_forecasts, es_forecasts,
                      confidence_level=PRIMARY_CONFIDENCE, notional=NOTIONAL_USD):
-    
+    """Compare VaR and ES reserves with realized shortfall.
+
+    The mean VaR/ES reserves and ``Incremental Capital Held`` are stock amounts
+    held at each mark.  ``Cumulative Unreserved`` values are realized flows:
+    ``sum(max(loss - forecast, 0)) * notional``.  The result also reports the
+    shortfall avoided by ES, its annualized value, residual ES breaches, and
+    the largest daily uncovered amounts.  Rows missing any of loss, VaR, or ES
+    are excluded from both reserve and shortfall calculations.
+    """
     losses = np.asarray(losses, dtype=float)
     var = np.asarray(var_forecasts, dtype=float)
     es = np.asarray(es_forecasts, dtype=float)
@@ -129,7 +156,11 @@ def reserve_adequacy(losses, var_forecasts, es_forecasts,
 def model_economic_comparison(baseline_frame=None,
                               confidence_level=PRIMARY_CONFIDENCE,
                               notional=NOTIONAL_USD):
-    
+    """Compare Gaussian, Historical, and GARCH-EVT VaR in monetary terms.
+
+    Each model is passed through :func:`economic_summary`; the returned table
+    adds cumulative unreserved loss in USD millions for easier comparison.
+    """
     if baseline_frame is None:
         baseline_frame = pd.read_csv(M4_BASELINE_BACKTEST, index_col=0, parse_dates=True)
     rows = []
@@ -149,7 +180,7 @@ def model_economic_comparison(baseline_frame=None,
 
 
 def registers_by_model(baseline_frame, notional=NOTIONAL_USD):
-    
+    """Build dated, excess-descending breach registers for the three VaR models."""
     return {
         label: build_breach_register(
             baseline_frame.index, baseline_frame["Loss"],
@@ -162,7 +193,11 @@ def registers_by_model(baseline_frame, notional=NOTIONAL_USD):
 
 
 def economic_headline(summary_row, adequacy_row, notional=NOTIONAL_USD):
-    
+    """Render computed frequency, magnitude, and reserve results as prose.
+
+    This helper only formats values already present in the supplied summary and
+    adequacy mappings; it does not estimate additional economic quantities.
+    """
     low, high = summary_row["Breach Rate 95% CI (%)"]
     years = summary_row["Total Obs"] / 252.0
     return {

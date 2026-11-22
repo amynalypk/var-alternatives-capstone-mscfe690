@@ -1,5 +1,6 @@
 
 
+"""Run and cache per-asset walk-forward GARCH forecasts and standardised innovations."""
 import os
 import time
 
@@ -19,6 +20,7 @@ def _asset_path(values, window=ROLLING_WINDOW, refit_interval=GARCH_REFIT_INTERV
                 dist=ASSET_WF_INNOVATION_DISTRIBUTION,
                 recursion=VARIANCE_RECURSION):
     
+    """Compute or assemble the _asset_path result used by the asset_walk_forward analysis."""
     if recursion not in ("legacy", "corrected"):
         raise ValueError(f"unknown variance_recursion: {recursion}")
 
@@ -63,6 +65,7 @@ def run_asset_walk_forward(returns_df, tickers=TICKERS,
                            recursion=VARIANCE_RECURSION,
                            store_dir=M6_ASSET_STORE_DIR, force=False):
     
+    """Compute or assemble the run_asset_walk_forward result used by the asset_walk_forward analysis."""
     os.makedirs(store_dir, exist_ok=True)
     store = {}
     n_cached = 0
@@ -93,11 +96,13 @@ def run_asset_walk_forward(returns_df, tickers=TICKERS,
 
 
 def _store_suffix(dist, window, refit_interval, recursion):
+    """Compute or assemble the _store_suffix result used by the asset_walk_forward analysis."""
     return f"_dist-{dist}_win-{window}_refit-{refit_interval}_{recursion}.csv"
 
 
 def _store_path(store_dir, ticker, dist, window, refit_interval, recursion):
     
+    """Compute or assemble the _store_path result used by the asset_walk_forward analysis."""
     return os.path.join(
         store_dir, f"{ticker}{_store_suffix(dist, window, refit_interval, recursion)}")
 
@@ -106,6 +111,7 @@ def list_store(store_dir=M6_ASSET_STORE_DIR, dist=ASSET_WF_INNOVATION_DISTRIBUTI
                window=ROLLING_WINDOW, refit_interval=GARCH_REFIT_INTERVAL,
                recursion=VARIANCE_RECURSION):
     
+    """Compute or assemble the list_store result used by the asset_walk_forward analysis."""
     if not os.path.isdir(store_dir):
         return []
     suffix = _store_suffix(dist, window, refit_interval, recursion)
@@ -115,6 +121,7 @@ def list_store(store_dir=M6_ASSET_STORE_DIR, dist=ASSET_WF_INNOVATION_DISTRIBUTI
 
 def assemble(store):
     
+    """Compute or assemble the assemble result used by the asset_walk_forward analysis."""
     common = None
     for frame in store.values():
         common = frame.index if common is None else common.intersection(frame.index)
@@ -132,6 +139,7 @@ def load_asset_store(tickers=TICKERS, dist=ASSET_WF_INNOVATION_DISTRIBUTION,
                      window=ROLLING_WINDOW, refit_interval=GARCH_REFIT_INTERVAL,
                      recursion=VARIANCE_RECURSION, store_dir=M6_ASSET_STORE_DIR):
     
+    """Compute or assemble the load_asset_store result used by the asset_walk_forward analysis."""
     kwargs = dict(dist=dist, window=window, refit_interval=refit_interval,
                   recursion=recursion)
     missing = [t for t in tickers

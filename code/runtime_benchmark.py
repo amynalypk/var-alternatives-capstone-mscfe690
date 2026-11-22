@@ -1,5 +1,6 @@
 
 
+"""Measure calibration cost, refit cadence, and sweep-sharing efficiency."""
 import json
 import os
 import platform
@@ -32,6 +33,7 @@ OOS_DAYS = 4531
 
 def environment_fingerprint():
     
+    """Compute or assemble the environment_fingerprint result used by the runtime_benchmark analysis."""
     import arch
     import scipy
     import statsmodels
@@ -55,7 +57,9 @@ def environment_fingerprint():
 def _time_callables(fast=BENCH_REPEATS_FAST, slow=BENCH_REPEATS_SLOW,
                     warmup=BENCH_WARMUP):
     
+    """Compute or assemble the _time_callables result used by the runtime_benchmark analysis."""
     def run(fn, repeats):
+        """Compute or assemble the run result used by the runtime_benchmark analysis."""
         for _ in range(warmup):
             fn()
         samples = []
@@ -80,6 +84,7 @@ def benchmark_model_costs(train_slice, n_assets=20, window=ROLLING_WINDOW,
                           fast=BENCH_REPEATS_FAST, slow=BENCH_REPEATS_SLOW,
                           warmup=BENCH_WARMUP, n_test=OOS_DAYS):
     
+    """Compute or assemble the benchmark_model_costs result used by the runtime_benchmark analysis."""
     run = _time_callables(fast, slow, warmup)
     arr = np.asarray(train_slice, dtype=float)
 
@@ -157,6 +162,7 @@ def benchmark_model_costs(train_slice, n_assets=20, window=ROLLING_WINDOW,
 
 def _joint_calibration(arr, threshold_quantile):
     
+    """Compute or assemble the _joint_calibration result used by the runtime_benchmark analysis."""
     res, cond_vol, std_resid, mu = fit_garch11(arr, dist=PRIMARY_GARCH_INNOVATION_DISTRIBUTION)
     diag = fit_evt_pot_diag(std_resid, threshold_quantile)
     compute_evt_quantiles(diag["u"], diag["xi_used"], diag["beta"], diag["n_u"],
@@ -167,6 +173,7 @@ def _joint_calibration(arr, threshold_quantile):
 def benchmark_refit_cadence(portfolio_returns, intervals=BENCH_REFIT_INTERVALS,
                             window=ROLLING_WINDOW):
     
+    """Compute or assemble the benchmark_refit_cadence result used by the runtime_benchmark analysis."""
     losses = -np.asarray(portfolio_returns.values[window:], dtype=float)
     rows = []
     for k in intervals:
@@ -203,6 +210,7 @@ def benchmark_refit_cadence(portfolio_returns, intervals=BENCH_REFIT_INTERVALS,
 
 def benchmark_sweep_sharing(portfolio_returns, window=ROLLING_WINDOW):
     
+    """Compute or assemble the benchmark_sweep_sharing result used by the runtime_benchmark analysis."""
     single = dict(confidence_levels=(PRIMARY_CONFIDENCE,),
                   threshold_quantiles=(PRIMARY_POT_THRESHOLD_QUANTILE,),
                   innovation_dists=(PRIMARY_GARCH_INNOVATION_DISTRIBUTION,))
@@ -231,6 +239,7 @@ def benchmark_sweep_sharing(portfolio_returns, window=ROLLING_WINDOW):
 
 def run_runtime_benchmarks(portfolio_returns, write_cache=True):
     
+    """Compute or assemble the run_runtime_benchmarks result used by the runtime_benchmark analysis."""
     costs = benchmark_model_costs(portfolio_returns.iloc[:ROLLING_WINDOW].to_numpy())
     cadence = benchmark_refit_cadence(portfolio_returns)
     sharing = benchmark_sweep_sharing(portfolio_returns)

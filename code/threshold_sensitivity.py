@@ -1,5 +1,6 @@
 
 
+"""Profile POT thresholds and compare EVT sensitivity in and out of sample."""
 import numpy as np
 import pandas as pd
 
@@ -34,6 +35,7 @@ MEL_GRID_MIN_EXCEEDANCES = MIN_EXCEEDANCES_FULL_SAMPLE
 
 def garch_innovations(returns, dist="normal", window=None):
     
+    """Compute or assemble the garch_innovations result used by the threshold_sensitivity analysis."""
     slice_ = returns if window is None else returns.iloc[:window]
     state = fit_garch11_state(slice_, dist=dist)
     return np.asarray(state["std_resid"], dtype=float), state
@@ -43,6 +45,7 @@ def profile_over_thresholds(std_resid, quantiles=POT_THRESHOLD_QUANTILES,
                             confidence_levels=CONFIDENCE_LEVELS,
                             min_exceedances=10):
     
+    """Compute or assemble the profile_over_thresholds result used by the threshold_sensitivity analysis."""
     rows = []
     for q in quantiles:
         for alpha in confidence_levels:
@@ -95,6 +98,7 @@ def profile_over_thresholds(std_resid, quantiles=POT_THRESHOLD_QUANTILES,
 def mel_table(std_resid, n_points=MEL_GRID_POINTS,
               min_exceedances=MEL_GRID_MIN_EXCEEDANCES):
     
+    """Compute or assemble the mel_table result used by the threshold_sensitivity analysis."""
     losses = -np.asarray(std_resid, dtype=float)
     top_percentile = 100.0 * (1.0 - min_exceedances / len(losses))
     grid = np.percentile(losses, np.linspace(50.0, top_percentile, n_points))
@@ -126,6 +130,7 @@ MIN_BAND_POINTS = 4
 def linear_mel_band(curve, z_tol=MEL_LINEAR_Z_TOL,
                     min_exceedances=MIN_EXCEEDANCES_FULL_SAMPLE):
     
+    """Compute or assemble the linear_mel_band result used by the threshold_sensitivity analysis."""
     usable = curve[(curve["n_exceedances"] >= min_exceedances)
                    & curve["sample_e_hat"].notna()
                    & curve["se_excess"].notna()].sort_values("u").reset_index(drop=True)
@@ -178,6 +183,7 @@ def linear_mel_band(curve, z_tol=MEL_LINEAR_Z_TOL,
 def select_threshold(curve, profile, alpha=PRIMARY_CONFIDENCE,
                      production_q=PRIMARY_POT_THRESHOLD_QUANTILE):
     
+    """Compute or assemble the select_threshold result used by the threshold_sensitivity analysis."""
     band = linear_mel_band(curve)
 
     eligible, rejected, all_var = [], [], []
@@ -303,6 +309,7 @@ def select_threshold(curve, profile, alpha=PRIMARY_CONFIDENCE,
 def walk_forward_sensitivity_table(sweep_frame, portfolio_returns,
                                    notional=NOTIONAL_USD):
     
+    """Compute or assemble the walk_forward_sensitivity_table result used by the threshold_sensitivity analysis."""
     rows = []
     keys = ["innovation_dist", "threshold_q", "confidence_level"]
     for (dist, q, alpha), group in sweep_frame.groupby(keys, sort=True):

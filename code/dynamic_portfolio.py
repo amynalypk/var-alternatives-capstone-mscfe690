@@ -1,4 +1,13 @@
+"""Walk-forward portfolio allocation, trading simulation, and evaluation.
 
+Target weights are solved on a fixed trading-day schedule from aligned raw or
+conditional return scenarios.  ``simulate_book`` then lets holdings drift with
+realized asset returns, compares the next target with those held weights, and
+nets stylised turnover costs.  The dynamic risk engine evaluates the exposed
+book with the corrected GARCH-EVT recursion.  This module implements equal
+weight, minimum-variance, and minimum-Expected-Shortfall variants; risk parity,
+volume-based liquidity, and copula stress models are outside this deliverable.
+"""
 
 import os
 import time
@@ -40,7 +49,12 @@ STRATEGIES = {
 
 
 def scenario_block(matrices, i, full_returns, window=ROLLING_WINDOW):
-    
+    """Assemble the trailing scenario block used by an allocation decision.
+
+    Early decisions use raw returns for the part of the rolling window before
+    standardized residuals exist.  Later decisions use conditional scenarios
+    from the asset-level forecast mean, volatility, and aligned residual rows.
+    """
     hist_r = full_returns.iloc[i: i + window].to_numpy(dtype=float)
     if hist_r.shape[0] != window:
         raise ValueError(f"day {i} has fewer than {window} rows of price history behind it")
@@ -86,7 +100,14 @@ def _solve_at(matrices, i, spec, w_prev, expected_returns, full_returns):
 
 def build_weight_schedule(matrices, full_returns, strategies=STRATEGIES,
                           interval=REBALANCE_INTERVAL):
-    
+    """Create target-weight schedules without using future observations.
+
+    A new target is solved when ``i % interval == 0``; otherwise the prior
+    target is carried forward.  The default interval is 20 trading days and is
+    shared with the GARCH/EVT refit cadence.  A failed solve retains the prior
+    target and records a diagnostic.  Buy-and-hold is solved once, while other
+    strategies are periodically re-optimised.
+    """
     dates = matrices["z"].index
     n = matrices["z"].shape[1]
     tickers = list(matrices["z"].columns)
@@ -128,7 +149,15 @@ def build_weight_schedule(matrices, full_returns, strategies=STRATEGIES,
 
 def simulate_book(weights_frame, returns_frame, interval=REBALANCE_INTERVAL,
                   cost_bps=TXN_COST_BPS, rebalance=True):
-    
+    """Simulate target allocations, drifted holdings, turnover, and costs.
+
+    Between scheduled rebalances, realized returns change market-value weights.
+    Turnover compares the next target with those drifted holdings, not with the
+    previous target.  The one-way turnover cap and 10-basis-point cost are implementation
+    frictions; they are not calibrated volume, spread, market-impact, or forced
+    liquidation assumptions and therefore do not constitute a full liquidity
+    stress model.
+    """
     w = weights_frame.to_numpy(dtype=float)
     r = returns_frame.reindex(weights_frame.index).to_numpy(dtype=float)
     n_days, n_assets = r.shape
@@ -178,7 +207,12 @@ def run_dynamic_book_walk_forward(held_weights, full_returns, realized_returns=N
                                   threshold_quantile=PRIMARY_POT_THRESHOLD_QUANTILE,
                                   innovation_dist=PRIMARY_GARCH_INNOVATION_DISTRIBUTION,
                                   recursion=VARIANCE_RECURSION):
-    
+    """Forecast VaR and ES for the book actually held each day.
+
+    The function uses the corrected GARCH-EVT recursion only and aligns the
+    realized portfolio return with the drifted held-weight frame.  It returns
+    realized return, positive loss, VaR, and ES columns for downstream scoring.
+    """
     if recursion != "corrected":
         raise ValueError(
             "the dynamic-book backtest is only run on the corrected recursion; "
@@ -423,7 +457,12 @@ def concentration_summary(schedules):
 
 def es_reduction_table(matrices, full_returns, alphas=ES_LP_ALPHAS,
                        interval=REBALANCE_INTERVAL, sample_every=5):
-    
+    """Compare minimum-ES forecasts with equal weight across alpha levels.
+
+    The table records forecast ES, percentage reduction, number of names,
+    Herfindahl concentration, and solver status at sampled decision dates.  It
+    is a forecast-risk diagnostic, not proof of superior realized performance.
+    """
     dates = matrices["z"].index
     n = matrices["z"].shape[1]
     ew = equal_weight(n)
@@ -451,7 +490,14 @@ def es_reduction_table(matrices, full_returns, alphas=ES_LP_ALPHAS,
 
 def run_optimisation(returns_df=None, strategies=STRATEGIES, force=False, quick=False,
                      write_cache=True):
-    
+    """Run the complete dynamic allocation comparison and collect outputs.
+
+    The returned payload contains schedules, drifted books, risk frames,
+    realized-engine frames, strategy metrics, concentration diagnostics,
+    minimum-ES reduction paths, and solver failures.  Optional cache writing
+    stores the target-weight history; it does not replace the in-memory held
+    weights used for simulation and risk evaluation.
+    """
     from data_acquisition import fetch_and_cache_data, process_returns
     from asset_walk_forward import load_asset_store
 

@@ -1,5 +1,6 @@
 
 
+"""Provide diagnostics for GARCH innovations, filters, and EVT inputs."""
 import numpy as np
 import pandas as pd
 
@@ -15,6 +16,7 @@ from forecast_eval import score_forecasts
 
 def _flatten(diag):
     
+    """Compute or assemble the _flatten result used by the residual_analysis analysis."""
     second_order_family = len(LB_LAGS) + 1
     first_order_family = len(LB_LAGS)
     lb_z_min = float(min(diag["ljung_box_z_pvalues"].values()))
@@ -64,6 +66,7 @@ def _flatten(diag):
 def innovation_diagnostics_table(portfolio_returns, windows=None,
                                  innovation_dists=tuple(GARCH_INNOVATION_DISTRIBUTIONS)):
     
+    """Compute or assemble the innovation_diagnostics_table result used by the residual_analysis analysis."""
     windows = {"calibration_500d": ROLLING_WINDOW, "full_sample": None} \
         if windows is None else windows
     rows = []
@@ -97,6 +100,7 @@ def innovation_diagnostics_table(portfolio_returns, windows=None,
 def filter_parameter_table(portfolio_returns, window=None,
                            innovation_dists=tuple(GARCH_INNOVATION_DISTRIBUTIONS)):
     
+    """Compute or assemble the filter_parameter_table result used by the residual_analysis analysis."""
     slice_ = portfolio_returns if window is None else portfolio_returns.iloc[:window]
     rows = []
     for dist in innovation_dists:
@@ -125,6 +129,7 @@ def filter_parameter_table(portfolio_returns, window=None,
 
 
 def _evt_profile_for_dist(portfolio_returns, dist, quantiles, window=None):
+    """Compute or assemble the _evt_profile_for_dist result used by the residual_analysis analysis."""
     slice_ = portfolio_returns if window is None else portfolio_returns.iloc[:window]
     state = fit_garch11_state(slice_, dist=dist)
     prof = gpd_profile_over_thresholds(state["std_resid"], quantiles)
@@ -135,6 +140,7 @@ def _evt_profile_for_dist(portfolio_returns, dist, quantiles, window=None):
 def evt_across_filters_table(portfolio_returns, quantiles=tuple(POT_THRESHOLD_QUANTILES),
                              window=None):
     
+    """Compute or assemble the evt_across_filters_table result used by the residual_analysis analysis."""
     frames = [_evt_profile_for_dist(portfolio_returns, d, quantiles, window)
               for d in GARCH_INNOVATION_DISTRIBUTIONS]
     return pd.concat(frames, ignore_index=True)
@@ -145,6 +151,7 @@ def walk_forward_filter_table(sweep_frame, portfolio_returns,
                               confidence_level=PRIMARY_CONFIDENCE,
                               notional=NOTIONAL_USD):
     
+    """Compute or assemble the walk_forward_filter_table result used by the residual_analysis analysis."""
     rows = []
     for dist in GARCH_INNOVATION_DISTRIBUTIONS:
         for q in quantiles:
@@ -179,6 +186,7 @@ def walk_forward_filter_table(sweep_frame, portfolio_returns,
 
 def filter_difference_summary(walk_forward_table):
     
+    """Compute or assemble the filter_difference_summary result used by the residual_analysis analysis."""
     out = []
     for q in walk_forward_table.index.get_level_values("threshold_q").unique():
         sub = walk_forward_table.xs(q, level="threshold_q")
@@ -210,6 +218,7 @@ def filter_difference_summary(walk_forward_table):
 
 def iid_verdict(diagnostics_table):
     
+    """Compute or assemble the iid_verdict result used by the residual_analysis analysis."""
     rows = {}
     for _, r in diagnostics_table.iterrows():
         if r["window"] != "full_sample":

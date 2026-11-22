@@ -1,3 +1,11 @@
+"""Generate the retained Module 4 publication figures (Figures 1–5).
+
+The plotting functions summarize portfolio performance, tail behaviour,
+walk-forward risk forecasts, regime failures, and allocation robustness. They
+write reproducible 300-DPI PNG files to the configured ``figures/`` directory
+using supplied or cached analysis data.
+"""
+
 import os
 import numpy as np
 import pandas as pd
@@ -18,7 +26,14 @@ plt.rcParams['lines.linewidth'] = 1.3
 plt.rcParams['grid.alpha'] = 0.35
 plt.rcParams['grid.linestyle'] = '--'
 
+
+def _ensure_figures_dir():
+    """Create the configured output directory before saving a figure."""
+    os.makedirs(FIGURES_DIR, exist_ok=True)
+
+
 def plot_cumulative_performance_and_drawdowns(returns_df, save_name="fig1_portfolio_vs_market_drawdowns.png"):
+    """Compute or assemble the plot_cumulative_performance_and_drawdowns result used by the visualizations analysis."""
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 7), sharex=True, gridspec_kw={'height_ratios': [2, 1.2]})
     
     port_cum = (1.0 + returns_df['Portfolio']).cumprod() * 100.0
@@ -30,6 +45,7 @@ def plot_cumulative_performance_and_drawdowns(returns_df, save_name="fig1_portfo
     ax1.plot(port_cum.index, port_cum, label='20-Stock Equal-Weighted Portfolio', color='#1f77b4', lw=1.6)
     ax1.plot(spy_cum.index, spy_cum, label='S&P 500 Benchmark (SPY)', color='#ff7f0e', lw=1.4, linestyle='--')
     ax1.set_ylabel('Growth of $100 ($)')
+    ax1.set_xlabel('Calendar Year')
     ax1.set_title('Figure 1: Cumulative Portfolio Wealth and Historical Drawdowns (2005–2024)', fontweight='bold', pad=10)
     ax1.grid(True)
     ax1.legend(loc='upper left', framealpha=0.9)
@@ -55,6 +71,7 @@ def plot_cumulative_performance_and_drawdowns(returns_df, save_name="fig1_portfo
     fig.autofmt_xdate()
     plt.tight_layout()
     
+    _ensure_figures_dir()
     save_path = os.path.join(FIGURES_DIR, save_name)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
@@ -62,6 +79,7 @@ def plot_cumulative_performance_and_drawdowns(returns_df, save_name="fig1_portfo
     return save_path
 
 def plot_tail_diagnostics_and_gpd(portfolio_returns, std_resid, save_name="fig2_fat_tailed_diagnostics_gpd_fit.png"):
+    """Compute or assemble the plot_tail_diagnostics_and_gpd result used by the visualizations analysis."""
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
     
     ax = axes[0]
@@ -115,6 +133,7 @@ def plot_tail_diagnostics_and_gpd(portfolio_returns, std_resid, save_name="fig2_
     ax.legend(loc='upper right', fontsize=8.5)
     
     plt.tight_layout()
+    _ensure_figures_dir()
     save_path = os.path.join(FIGURES_DIR, save_name)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
@@ -122,6 +141,7 @@ def plot_tail_diagnostics_and_gpd(portfolio_returns, std_resid, save_name="fig2_
     return save_path
 
 def plot_walk_forward_backtest_with_crises(results_df, save_name="fig3_rolling_var_es_backtest_crises.png"):
+    """Compute or assemble the plot_walk_forward_backtest_with_crises result used by the visualizations analysis."""
     fig = plt.figure(figsize=(15, 9))
     gs = fig.add_gridspec(2, 2, height_ratios=[1.3, 1.0])
     
@@ -141,6 +161,7 @@ def plot_walk_forward_backtest_with_crises(results_df, save_name="fig3_rolling_v
     ax_main.plot(results_df.index, var_e_pct, label='99% Dynamic GARCH-EVT VaR', color='blue', lw=1.3)
     ax_main.plot(results_df.index, es_e_pct, label='99% Dynamic GARCH-EVT ES (CVaR)', color='purple', lw=1.4, linestyle='--')
     
+    ax_main.set_xlabel('Date')
     ax_main.set_ylabel('Loss / Risk Measure (%)')
     ax_main.set_title('Figure 3: Out-of-Sample 99% Walk-Forward Risk Forecasts vs Realized Losses (2007–2024)', fontweight='bold')
     ax_main.set_ylim(-3, 16)
@@ -157,6 +178,7 @@ def plot_walk_forward_backtest_with_crises(results_df, save_name="fig3_rolling_v
         ax_gfc.plot(gfc_df.index, gfc_df['VaR_GARCH_EVT'] * 100, color='blue', lw=1.5, label='GARCH-EVT VaR')
         ax_gfc.plot(gfc_df.index, gfc_df['ES_GARCH_EVT'] * 100, color='purple', lw=1.6, linestyle='--', label='GARCH-EVT ES')
         ax_gfc.set_title('(B) 2008 Global Financial Crisis Shock', fontweight='bold', fontsize=10.5)
+        ax_gfc.set_xlabel('Date')
         ax_gfc.set_ylabel('Loss / Risk Measure (%)')
         ax_gfc.grid(True)
         ax_gfc.xaxis.set_major_formatter(mdates.DateFormatter('%b %y'))
@@ -170,12 +192,14 @@ def plot_walk_forward_backtest_with_crises(results_df, save_name="fig3_rolling_v
         ax_covid.plot(covid_df.index, covid_df['VaR_GARCH_EVT'] * 100, color='blue', lw=1.5, label='GARCH-EVT VaR')
         ax_covid.plot(covid_df.index, covid_df['ES_GARCH_EVT'] * 100, color='purple', lw=1.6, linestyle='--', label='GARCH-EVT ES')
         ax_covid.set_title('(C) March 2020 COVID-19 Liquidity Crash', fontweight='bold', fontsize=10.5)
+        ax_covid.set_xlabel('Date')
         ax_covid.set_ylabel('Loss / Risk Measure (%)')
         ax_covid.grid(True)
         ax_covid.xaxis.set_major_formatter(mdates.DateFormatter('%b %y'))
         ax_covid.legend(loc='upper right', fontsize=8)
         
     plt.tight_layout()
+    _ensure_figures_dir()
     save_path = os.path.join(FIGURES_DIR, save_name)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
@@ -183,6 +207,7 @@ def plot_walk_forward_backtest_with_crises(results_df, save_name="fig3_rolling_v
     return save_path
 
 def plot_regime_failure_rates(regime_summary, save_name="fig4_backtest_violations_by_regime.png"):
+    """Compute or assemble the plot_regime_failure_rates result used by the visualizations analysis."""
     regimes_to_plot = ["Calm (VIX < 20)", "Normal (20 <= VIX < 30)", "Crisis (VIX >= 30)"]
     labels = ["Calm\n(VIX < 20)", "Normal\n(20 ≤ VIX < 30)", "Crisis\n(VIX ≥ 30)"]
     
@@ -209,7 +234,7 @@ def plot_regime_failure_rates(regime_summary, save_name="fig4_backtest_violation
     ax.set_xticklabels(labels, fontweight='bold')
     ax.legend(loc='upper left', framealpha=0.9)
     ax.grid(True, axis='y')
-    ax.set_ylim(0, max(norm_rates) * 1.25)
+    ax.set_ylim(0, max(norm_rates + hist_rates + evt_rates + es_rates) * 1.25)
     
     for rects in [rects1, rects2, rects3, rects4]:
         for rect in rects:
@@ -220,6 +245,7 @@ def plot_regime_failure_rates(regime_summary, save_name="fig4_backtest_violation
                         ha='center', va='bottom', fontsize=8)
                         
     plt.tight_layout()
+    _ensure_figures_dir()
     save_path = os.path.join(FIGURES_DIR, save_name)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
@@ -227,6 +253,7 @@ def plot_regime_failure_rates(regime_summary, save_name="fig4_backtest_violation
     return save_path
 
 def plot_dirichlet_robustness(dirichlet_results, save_name="fig5_dirichlet_robustness_test.png"):
+    """Compute or assemble the plot_dirichlet_robustness result used by the visualizations analysis."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5))
     
     data = [
@@ -245,6 +272,7 @@ def plot_dirichlet_robustness(dirichlet_results, save_name="fig5_dirichlet_robus
         median.set(color='black', linewidth=1.5)
         
     ax1.axhline(1.0, color='red', linestyle='--', lw=1.3, label='Theoretical 1.0% Target')
+    ax1.set_xlabel('Risk model')
     ax1.set_ylabel('Full-Sample Breach Rate (%)')
     ax1.set_title('(A) 100 Dirichlet Portfolios: Breach Rate Spread', fontweight='bold')
     ax1.grid(True, axis='y')
@@ -262,6 +290,7 @@ def plot_dirichlet_robustness(dirichlet_results, save_name="fig5_dirichlet_robus
     
     plt.suptitle('Figure 5: Allocation Robustness Evaluation Across 100 Dirichlet Portfolio Weightings', fontweight='bold', y=1.02)
     plt.tight_layout()
+    _ensure_figures_dir()
     save_path = os.path.join(FIGURES_DIR, save_name)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()

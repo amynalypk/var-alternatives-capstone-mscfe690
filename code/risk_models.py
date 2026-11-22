@@ -1,3 +1,18 @@
+"""Risk estimators for the capstone's VaR-alternative framework.
+
+The module contains two baseline loss measures (Gaussian/parametric VaR and
+Historical Simulation VaR) and the production two-stage GARCH-EVT model.  The
+latter filters returns with a GARCH(1, 1) conditional-volatility model, fits a
+Generalized Pareto Distribution (GPD) to the negative standardized residuals
+above a Peaks-Over-Threshold (POT) level, and converts the resulting tail VaR
+and Expected Shortfall (ES) quantiles back to return-scale positive losses.
+
+Returns retain their usual sign (negative values are losses).  Risk outputs
+are positive loss or reserve magnitudes, so a realized loss breaches a forecast
+when ``-return > VaR``.  Defaults and production grids are centralized in
+:mod:`config`; this module does not duplicate those settings.
+"""
+
 import numpy as np
 import pandas as pd
 from scipy.stats import norm, t as t_dist, genpareto, kurtosis, skew, kstest
@@ -25,29 +40,50 @@ XI_ADMISSIBLE_MAX = 0.8
 
 
 class InsufficientExceedances(ValueError):
-    pass
+    """Raised when a POT tail has too few observations for a GPD fit."""
 
 
 class InvalidThresholdConfiguration(ValueError):
-    pass
+    """Raised when the requested confidence level cannot be extrapolated."""
 
 
 def calculate_parametric_var(returns, confidence_level=0.99):
+    """Calculate Gaussian one-period VaR as a positive loss magnitude.
+
+    The estimate is ``-(mean + Phi^-1(1-c) * sample_std)``.  Thus the lower
+    return-tail quantile is negated so it can be compared with ``-return``.
+    ``returns`` may be an array-like sequence of signed returns.
+    """
     mean = np.mean(returns)
     std = np.std(returns, ddof=1)
     z_score = norm.ppf(1 - confidence_level)
     var = -(mean + z_score * std)
     return float(var)
 
+
 def calculate_historical_var(returns, confidence_level=0.99):
+    """Calculate Historical Simulation VaR from the empirical return tail.
+
+    The ``(1-confidence_level)`` return percentile is negated into a positive
+    loss threshold.  Unlike parametric VaR, this does not impose a Normal
+    distribution on the observed returns.
+    """
     var = -np.percentile(returns, (1 - confidence_level) * 100)
     return float(var)
 
 def fit_garch11(returns, dist="normal", include_nu=False):
-    
+    """Fit a constant-mean GARCH(1, 1) filter to signed returns.
+
+    ``arch`` is fit on returns multiplied by 100 for numerical stability; the
+    returned conditional volatility, mean, and standardized residuals are back
+    in the input return units.  ``dist`` accepts the aliases in
+    ``GARCH_DISTRIBUTION_ALIASES``.  Normal innovations are the baseline;
+    Student-t innovations additionally return fitted degrees of freedom when
+    ``include_nu=True``.  The default four-value return contract is preserved;
+    fitting or optimizer errors from ``arch`` are intentionally propagated.
+    """
     dist = GARCH_DISTRIBUTION_ALIASES[dist]
-    
-    
+
     am = arch_model(returns * 100.0, mean='Constant', vol='GARCH', p=1, q=1, dist=dist)
     res = am.fit(disp='off', show_warning=False)
 
@@ -61,8 +97,9 @@ def fit_garch11(returns, dist="normal", include_nu=False):
         return res, cond_vol, std_resid, mu, nu
     return res, cond_vol, std_resid, mu
 
+
 def fit_garch11_state(returns, dist="normal"):
-    
+    """Return GARCH parameters and filtered series in a walk-forward state."""
     res, cond_vol, std_resid, mu, nu = fit_garch11(returns, dist=dist, include_nu=True)
     return {
         "dist": GARCH_DISTRIBUTION_ALIASES[dist],
@@ -83,7 +120,17 @@ def fit_garch11_state(returns, dist="normal"):
     }
 
 def fit_evt_pot(std_resid, threshold_quantile=0.90, clamp_xi=True, min_exceedances=10):
-    
+    """Fit a GPD to standardized losses above a POT threshold.
+
+    Standardized residuals are negated into positive loss innovations.  The
+    threshold ``u`` is their selected percentile and exceedances are strictly
+    greater than ``u``.  ``xi`` is the tail-shape parameter and ``beta`` is the
+    positive scale.  With ``clamp_xi=False``, sparse tails raise
+    :class:`InsufficientExceedances`; with the default enabled, the existing
+    operational fallback ``xi=0.1, beta=1.0`` is returned and must not be read
+    as a fitted estimate.  Shape and scale constraints are applied only when
+    clamping is enabled.
+    """
     loss_innovations = -np.asarray(std_resid, dtype=float)
     u = float(np.percentile(loss_innovations, threshold_quantile * 100.0))
 
@@ -108,6 +155,7 @@ def fit_evt_pot(std_resid, threshold_quantile=0.90, clamp_xi=True, min_exceedanc
     return u, float(shape_xi), float(scale_beta), n_exceedances, total_n, loss_innovations
 
 def _gpd_negative_log_likelihood(params, exceedances):
+    """Return the constrained GPD negative log-likelihood for diagnostics."""
     xi, beta = float(params[0]), float(params[1])
     if beta <= 0.0:
         return np.inf
@@ -123,7 +171,12 @@ def _gpd_negative_log_likelihood(params, exceedances):
 
 
 def gpd_shape_standard_error(exceedances, xi, beta):
-    
+    """Estimate GPD shape and scale standard errors by observed information.
+
+    Returns ``(nan, nan)`` when the tail is too small, parameters are invalid,
+    finite-difference probes fail, or the estimated Hessian cannot be inverted.
+    These diagnostics are uncertainty estimates, not replacement fit values.
+    """
     exceedances = np.asarray(exceedances, dtype=float)
     if exceedances.size < 5 or not np.isfinite(xi) or not np.isfinite(beta) or beta <= 0:
         return np.nan, np.nan
@@ -138,7 +191,7 @@ def gpd_shape_standard_error(exceedances, xi, beta):
 
 
 def _observed_information_se(exceedances, xi, beta, scale):
-    
+    """Estimate parameter errors from a finite-difference observed Hessian."""
     base = _gpd_negative_log_likelihood(np.array([xi, beta]), exceedances)
     if not np.isfinite(base):
         return None
@@ -171,7 +224,14 @@ def _observed_information_se(exceedances, xi, beta, scale):
 
 
 def fit_evt_pot_diag(std_resid, threshold_quantile=PRIMARY_POT_THRESHOLD_QUANTILE, min_exceedances=10):
-    
+    """Fit a diagnostic-rich POT/GPD tail estimate.
+
+    Unlike :func:`fit_evt_pot`, an insufficient tail is reported as
+    ``degenerate=True`` with unset fit parameters rather than assigned
+    synthetic fallback values.  The record retains raw and clamped ``xi``,
+    scale, exceedance counts, standard errors, confidence intervals, KS
+    goodness-of-fit, and GPD AIC for threshold and model diagnostics.
+    """
     loss_innovations = -np.asarray(std_resid, dtype=float)
     u = float(np.percentile(loss_innovations, threshold_quantile * 100.0))
     exceedances = loss_innovations[loss_innovations > u] - u
@@ -231,6 +291,17 @@ def fit_evt_pot_diag(std_resid, threshold_quantile=PRIMARY_POT_THRESHOLD_QUANTIL
     return record
 
 def compute_evt_quantiles(u, xi, beta, n_exceedances, total_n, confidence_level=0.99):
+    """Compute standardized EVT VaR and Expected Shortfall quantiles.
+
+    The POT exceedance ratio converts the requested coverage into
+    ``p_tail = (1-c)/(n_exceedances/total_n)``.  Near ``xi=0`` the exponential
+    limit is used; otherwise the closed-form GPD VaR and ES expressions are
+    evaluated.  ``InvalidThresholdConfiguration`` is raised when the requested
+    tail is not beyond the fitted threshold.  For a valid finite ES, the GPD
+    shape must be below one; the caller is responsible for admissible fitting.
+    Both returned values are positive standardized loss magnitudes and ES is
+    expected to exceed VaR.
+    """
     tail_prob = (1.0 - confidence_level) / (n_exceedances / total_n)
 
     if tail_prob >= 1.0:
@@ -253,7 +324,12 @@ def compute_evt_quantiles(u, xi, beta, n_exceedances, total_n, confidence_level=
     return float(var_z), float(es_z)
 
 def mean_excess_curve(std_resid, u_grid=None, n_points=40, threshold_quantiles=None):
-    
+    """Estimate mean excess and sampling error over candidate thresholds.
+
+    The curve is a POT threshold-selection diagnostic.  It reports the mean
+    excess above each loss threshold, its standard error, and the number of
+    exceedances; it is not itself a VaR or ES forecast.
+    """
     losses = -np.asarray(std_resid, dtype=float)
     if u_grid is None:
         lo, hi = np.percentile(losses, [50.0, 98.0])
@@ -282,7 +358,7 @@ def mean_excess_curve(std_resid, u_grid=None, n_points=40, threshold_quantiles=N
     return curve
 
 def gpd_mean_excess(u, xi, beta):
-    
+    """Return the fitted GPD mean excess at threshold ``u`` for diagnostics."""
     if xi is None or beta is None:
         return np.nan
     if xi >= 1.0:
@@ -291,7 +367,14 @@ def gpd_mean_excess(u, xi, beta):
 
 def gpd_profile_over_thresholds(std_resid, quantiles, confidence_level=0.99,
                                 min_exceedances=10):
-    
+    """Profile POT/GPD fit quality and VaR/ES across threshold quantiles.
+
+    Quantiles at or above ``confidence_level`` are rejected because the EVT
+    extrapolation must extend beyond the fitted threshold.  Sparse thresholds
+    remain in the returned table as degenerate rows with missing tail
+    forecasts, allowing sensitivity analysis to distinguish missing fits from
+    zero risk.
+    """
     rows = []
     for q in quantiles:
         validate_pot_configuration(q, confidence_level)
@@ -342,7 +425,13 @@ def gpd_profile_over_thresholds(std_resid, quantiles, confidence_level=0.99,
     return pd.DataFrame(rows, columns=columns)
 
 def residual_diagnostics(std_resid, garch_result=None, lags=None, nlags=None, nu=None):
-    
+    """Diagnose dependence, ARCH effects, and innovation distribution.
+
+    The diagnostics test standardized residuals and their squares for serial
+    dependence, then report ARCH-LM, Jarque-Bera, skewness, kurtosis, and
+    Normal/Student-t goodness-of-fit results.  A non-finite p-value raises
+    ``ValueError`` rather than being silently interpreted as no evidence.
+    """
     lags = LB_LAGS if lags is None else lags
     nlags = ARCH_LM_LAGS if nlags is None else nlags
 
@@ -409,6 +498,17 @@ def residual_diagnostics(std_resid, garch_result=None, lags=None, nlags=None, nu
     }
 
 def calculate_garch_evt_risk(returns, confidence_level=0.99, threshold_quantile=0.90, dist="normal"):
+    """Forecast one-period GARCH-EVT VaR and Expected Shortfall.
+
+    This is the module's composite risk measure: it combines a GARCH(1, 1)
+    conditional-volatility forecast with a GPD tail fit, rather than taking a
+    weighted average of separate risk scores.  It fits GARCH, models negative
+    standardized residuals above the POT threshold, forecasts ``sigma_next``,
+    and transforms standardized tail quantiles to positive return-scale losses:
+    ``VaR = -mu + sigma_next * var_z`` and
+    ``ES = -mu + sigma_next * es_z``.  Underlying GARCH/GPD fit errors and
+    insufficient-data exceptions propagate to the caller.
+    """
     res, cond_vol, std_resid, mu = fit_garch11(returns, dist=dist)
     u, xi, beta, n_u, n_tot, _ = fit_evt_pot(std_resid, threshold_quantile)
     var_z, es_z = compute_evt_quantiles(u, xi, beta, n_u, n_tot, confidence_level)

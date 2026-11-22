@@ -1,4 +1,11 @@
+"""Generate the Module 6/7 extension publication figures (Figures 6–14).
 
+These figures document EVT threshold selection, innovation diagnostics,
+regime segmentation, breach economics, dynamic portfolio optimisation, and
+runtime-versus-accuracy trade-offs. They are generated reproducibly from the
+cached analysis data and metrics manifest and saved as 300-DPI PNG files in
+the configured ``figures/`` directory.
+"""
 
 import json
 import os
@@ -41,6 +48,7 @@ PERCENT = 100.0
 
 def _assert_annotations_visible(fig, save_name):
     
+    """Compute or assemble the _assert_annotations_visible result used by the visualizations_m6 analysis."""
     fig.canvas.draw()
     for artist in fig.findobj(mtext.Annotation):
         if not artist.get_visible() or artist.axes is None:
@@ -56,7 +64,8 @@ def _assert_annotations_visible(fig, save_name):
 
 
 def _finish(fig, save_name, suptitle, top=0.955):
-    
+
+    """Compute or assemble the _finish result used by the visualizations_m6 analysis."""
     for ax in fig.axes:
         if ax.get_title():
             if not ax.get_xlabel():
@@ -66,6 +75,7 @@ def _finish(fig, save_name, suptitle, top=0.955):
     fig.suptitle(suptitle, fontweight="bold", y=0.995)
     fig.tight_layout(rect=(0, 0, 1, top))
     _assert_annotations_visible(fig, save_name)
+    os.makedirs(FIGURES_DIR, exist_ok=True)
     path = os.path.join(FIGURES_DIR, save_name)
     fig.savefig(path, dpi=300, bbox_inches="tight")
     plt.close(fig)
@@ -74,17 +84,20 @@ def _finish(fig, save_name, suptitle, top=0.955):
 
 
 def _year_locator(ax, every=2):
+    """Compute or assemble the _year_locator result used by the visualizations_m6 analysis."""
     ax.xaxis.set_major_locator(mdates.YearLocator(every))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
 
 
 def _to_frame(data):
+    """Compute or assemble the _to_frame result used by the visualizations_m6 analysis."""
     frame = data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
     return frame.drop(columns=["index"], errors="ignore")
 
 
 def _stagger_xlabels(axis, values, fontsize=8.6, labelpad=6.0):
     
+    """Compute or assemble the _stagger_xlabels result used by the visualizations_m6 analysis."""
     axis.set_xticks(values)
     axis.set_xticklabels([])
     points_to_display = axis.get_figure().dpi / 72.0
@@ -116,6 +129,7 @@ def plot_mean_excess_plot(z, curve, band, production_u,
                           save_name="fig6_mean_excess_plot_threshold_selection.png",
                           innovation="Gaussian", n_observations=None):
     
+    """Compute or assemble the plot_mean_excess_plot result used by the visualizations_m6 analysis."""
     losses = -np.asarray(z, dtype=float)
     curve = _to_frame(curve)
     n_tot = losses.size if n_observations is None else int(n_observations)
@@ -176,6 +190,7 @@ def plot_threshold_sensitivity(profile, sensitivity, production_q,
                                confidence_level=PRIMARY_CONFIDENCE,
                                save_name="fig7_threshold_sensitivity.png"):
     
+    """Compute or assemble the plot_threshold_sensitivity result used by the visualizations_m6 analysis."""
     prof = _to_frame(profile)
     if {"threshold_quantile", "confidence_level"} <= set(prof.columns):
         prof = prof.set_index(["threshold_quantile", "confidence_level"])
@@ -261,6 +276,7 @@ def plot_threshold_sensitivity(profile, sensitivity, production_q,
 
 def _unit_variance_t(nu):
     
+    """Compute or assemble the _unit_variance_t result used by the visualizations_m6 analysis."""
     scale = float(np.sqrt(max(nu - 2.0, 1e-9) / max(nu, 2.0 + 1e-9)))
     return student_t(nu, scale=scale)
 
@@ -268,6 +284,7 @@ def _unit_variance_t(nu):
 def plot_innovation_diagnostics(z_normal, z_t, nu, n_lags=24,
                                 save_name="fig8_innovation_diagnostics.png"):
     
+    """Compute or assemble the plot_innovation_diagnostics result used by the visualizations_m6 analysis."""
     zn = np.asarray(z_normal, dtype=float)
     zt = np.asarray(z_t, dtype=float)
     fig, axes = plt.subplots(2, 2, figsize=(12.5, 9))
@@ -315,6 +332,7 @@ def plot_innovation_diagnostics(z_normal, z_t, nu, n_lags=24,
 
 def plot_filter_comparison(vol_paths, parameters, save_name="fig9_garch_normal_vs_t.png"):
     
+    """Compute or assemble the plot_filter_comparison result used by the visualizations_m6 analysis."""
     fig = plt.figure(figsize=(13, 8.5))
     gs = fig.add_gridspec(2, 2, height_ratios=(1.15, 1.0), width_ratios=(1.45, 1.0))
     styles = {"normal": (BLUE, "-"), "t": (ORANGE, "--")}
@@ -389,6 +407,7 @@ def plot_filter_comparison(vol_paths, parameters, save_name="fig9_garch_normal_v
 def plot_regime_panels(regime_frame, cross_tab, agreement, sector,
                        save_name="fig10_portfolio_vs_vix_regimes.png"):
     
+    """Compute or assemble the plot_regime_panels result used by the visualizations_m6 analysis."""
     frame = regime_frame.dropna(subset=["RealisedVol", "VIX_lag",
                                          "portfolio_regime_balanced"])
     fig, axes = plt.subplots(2, 2, figsize=(14, 9.5))
@@ -503,6 +522,7 @@ def plot_regime_panels(regime_frame, cross_tab, agreement, sector,
 def plot_breach_magnitudes(register, adequacy, vix, notional=NOTIONAL_USD,
                            save_name="fig11_breach_magnitudes_and_reserves.png"):
     
+    """Compute or assemble the plot_breach_magnitudes result used by the visualizations_m6 analysis."""
     reg = _to_frame(register).copy()
     if "Date" in reg.columns and not np.issubdtype(reg.index.dtype, np.datetime64):
         reg = reg.set_index("Date")
@@ -592,6 +612,7 @@ def plot_dynamic_books(paths, table, headline=("Equal weight (rebalanced)",
                                                "Minimum ES"),
                        save_name="fig12_dynamic_portfolio_optimisation.png"):
     
+    """Compute or assemble the plot_dynamic_books result used by the visualizations_m6 analysis."""
     long = _to_frame(paths).copy()
     long["Date"] = pd.to_datetime(long["Date"])
     wide = {column: long.pivot(index="Date", columns="Strategy", values=column)
@@ -675,6 +696,7 @@ def plot_dynamic_books(paths, table, headline=("Equal weight (rebalanced)",
 def plot_cost_vs_accuracy(model_costs, performance,
                           save_name="fig14_cost_vs_accuracy.png"):
     
+    """Compute or assemble the plot_cost_vs_accuracy result used by the visualizations_m6 analysis."""
     costs = _to_frame(model_costs)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6.4))
@@ -743,6 +765,7 @@ def plot_cost_vs_accuracy(model_costs, performance,
 def plot_es_frontier(reduction_records, table,
                      save_name="fig13_es_reduction_and_frontier.png"):
     
+    """Compute or assemble the plot_es_frontier result used by the visualizations_m6 analysis."""
     rec = _to_frame(reduction_records)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6.4))
 
@@ -800,6 +823,7 @@ def plot_es_frontier(reduction_records, table,
 def generate_module6_figures(manifest_path=M6_METRICS_MANIFEST, returns_df=None,
                              portfolio=None):
     
+    """Compute or assemble the generate_module6_figures result used by the visualizations_m6 analysis."""
     with open(manifest_path) as handle:
         manifest = json.load(handle)
     if returns_df is None or portfolio is None:
