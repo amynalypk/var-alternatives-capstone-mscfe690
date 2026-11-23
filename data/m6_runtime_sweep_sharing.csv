@@ -1,0 +1,9 @@
+,value
+configurations_in_sweep,20.0
+single_config_pass_wall_time_s,8.862580500001059
+single_config_refits,227.0
+shared_pass_wall_time_s,70.6481246000003
+shared_pass_refits,454.0
+naive_independent_passes_s,177.25161000002117
+saving_vs_independent (%),60.14246381175784
+cost_per_configuration_minute,0.05887343716666692

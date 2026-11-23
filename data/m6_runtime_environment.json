@@ -1,0 +1,16 @@
+{
+  "environment": {
+    "platform": "Windows-10-10.0.19045-SP0",
+    "python": "3.14.3",
+    "machine": "AMD64",
+    "processor": "Intel64 Family 6 Model 60 Stepping 3, GenuineIntel",
+    "cpu_count": 8,
+    "numpy": "2.4.4",
+    "pandas": "3.0.2",
+    "scipy": "1.18.0",
+    "statsmodels": "0.14.6",
+    "arch": "8.0.0",
+    "scikit_learn": "1.9.0"
+  },
+  "note": "fingerprint recorded beside the timing caches"
+}
